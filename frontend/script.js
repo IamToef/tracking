@@ -421,11 +421,13 @@ function getStudentName(sid) {
     return s ? s.name : sid.substring(0, 8);
 }
 
+// Helper for mentor name
 function getMentorName(mid) {
     const m = rawData.mentors.find(x => x.id === mid);
     return m ? m.name : mid.substring(0, 8);
 }
 
+// Translate day names
 function translateDay(day) {
     const days = {
         'monday': 'Thứ 2',

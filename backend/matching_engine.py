@@ -206,6 +206,22 @@ class MatchingEngine:
                 
                 score_cache[s_id][m_id] = w_theme * theme_score + w_jaccard * jaccard
 
+        # Precompute mentors by capacity for O(1) slot capacity lookup
+        mentors_by_capacity = {}
+        for s in students:
+            for s_slot in s['slots']:
+                s_day = s_slot['day']
+                s_start = time_to_min(s_slot['start_time'])
+                key = (s_day, s_start)
+                if key not in mentors_by_capacity:
+                    mentors_by_capacity[key] = []
+                    s_end = s_start + session_duration
+                    for m in mentors:
+                        for m_slot in m['capacity_minutes']:
+                            if m_slot['day'] == s_day and m_slot['start'] <= s_start and s_end <= m_slot['end']:
+                                mentors_by_capacity[key].append(m)
+                                break
+
         # Matching results
         assignments = []
         unassigned = []
@@ -300,17 +316,13 @@ class MatchingEngine:
             for s_slot in s['slots']:
                 s_day = s_slot['day']
                 s_start = time_to_min(s_slot['start_time'])
-                s_end = s_start + session_duration
-                for m in mentors:
+                key = (s_day, s_start)
+                for m in mentors_by_capacity.get(key, []):
                     if req_gender and m['gender'] != req_gender:
                         continue
                     if (s['id'], m['id']) in blocked_set:
                         continue
-                    # Check availability
-                    for m_slot in m['capacity_minutes']:
-                        if m_slot['day'] == s_day and m_slot['start'] <= s_start and s_end <= m_slot['end']:
-                            count += 1
-                            break
+                    count += 1
             return count
 
         # Sort regular students by actual number of compatible options
@@ -326,34 +338,27 @@ class MatchingEngine:
                 s_day = s_slot['day']
                 s_start = time_to_min(s_slot['start_time'])
                 s_end = s_start + session_duration
+                key = (s_day, s_start)
                 
-                for m in mentors:
+                for m in mentors_by_capacity.get(key, []):
                     if req_gender and m['gender'] != req_gender:
                         continue
                     if (s['id'], m['id']) in blocked_set:
                         continue
                     
-                    # Check availability
-                    avail = False
-                    for m_slot in m['capacity_minutes']:
-                        if m_slot['day'] == s_day and m_slot['start'] <= s_start and s_end <= m_slot['end']:
-                            avail = True
+                    # Check booking overlap
+                    overlap = False
+                    for b in m['bookings']:
+                        if b['day'] == s_day and not (s_end <= b['start_time'] or s_start >= b['end_time']):
+                            overlap = True
                             break
-                        
-                    if avail:
-                        # Check booking overlap
-                        overlap = False
-                        for b in m['bookings']:
-                            if b['day'] == s_day and not (s_end <= b['start_time'] or s_start >= b['end_time']):
-                                overlap = True
-                                break
-                        if not overlap:
-                            score = score_cache[s['id']][m['id']]
-                            candidates.append({
-                                'mentor': m,
-                                'slot': s_slot,
-                                'score': score
-                            })
+                    if not overlap:
+                        score = score_cache[s['id']][m['id']]
+                        candidates.append({
+                            'mentor': m,
+                            'slot': s_slot,
+                            'score': score
+                        })
                             
             if candidates:
                 candidates.sort(key=lambda x: x['score'], reverse=True)
@@ -401,30 +406,22 @@ class MatchingEngine:
                     s_day = s_slot['day']
                     s_start = time_to_min(s_slot['start_time'])
                     s_end = s_start + session_duration
+                    key = (s_day, s_start)
                     
-                    for m in mentors:
+                    for m in mentors_by_capacity.get(key, []):
                         if req_gender and m['gender'] != req_gender:
                             continue
                         if (s['id'], m['id']) in blocked_set:
                             continue
                             
-                        # Check availability
-                        avail = False
-                        for m_slot in m['capacity_minutes']:
-                            if m_slot['day'] == s_day and m_slot['start'] <= s_start and s_end <= m_slot['end']:
-                                avail = True
-                                break
-                        if not avail:
-                            continue
-                            
-                        # Find the booking that blocks this slot
-                        blocking_booking = None
+                        # Find all bookings that block this slot
+                        overlapping_bookings = []
                         for b in m['bookings']:
                             if b['day'] == s_day and not (s_end <= b['start_time'] or s_start >= b['end_time']):
-                                blocking_booking = b
-                                break
+                                overlapping_bookings.append(b)
                                 
-                        if blocking_booking:
+                        if len(overlapping_bookings) == 1:
+                            blocking_booking = overlapping_bookings[0]
                             occupy_sid = blocking_booking['student_id']
                             # Check if the occupying student is forced
                             is_occupy_forced = any(a['student_id'] == occupy_sid and a.get('is_forced') for a in assignments)
@@ -446,25 +443,20 @@ class MatchingEngine:
                                 alt_start = time_to_min(alt_s_slot['start_time'])
                                 alt_end = alt_start + session_duration
                                 
-                                if alt_day == s_day and alt_start == s_start:
-                                    continue
-                                    
-                                for m_alt in mentors:
+                                for m_alt in mentors_by_capacity.get((alt_day, alt_start), []):
                                     if s_occupy_req_gender and m_alt['gender'] != s_occupy_req_gender:
                                         continue
                                     if (s_occupy['id'], m_alt['id']) in blocked_set:
                                         continue
-                                        
-                                    alt_avail = False
-                                    for m_slot in m_alt['capacity_minutes']:
-                                        if m_slot['day'] == alt_day and m_slot['start'] <= alt_start and alt_end <= m_slot['end']:
-                                            alt_avail = True
-                                            break
-                                    if not alt_avail:
-                                        continue
+                                    if m_alt['id'] == m['id']:
+                                        # alt_slot must not overlap with s_slot
+                                        if alt_day == s_day and not (alt_end <= s_start or alt_start >= s_end):
+                                            continue
                                         
                                     alt_overlap = False
                                     for b_alt in m_alt['bookings']:
+                                        if m_alt['id'] == m['id'] and b_alt['student_id'] == occupy_sid:
+                                            continue
                                         if b_alt['day'] == alt_day and not (alt_end <= b_alt['start_time'] or alt_start >= b_alt['end_time']):
                                             alt_overlap = True
                                             break

@@ -4,8 +4,8 @@ from matching_engine import MatchingEngine, time_to_min
 
 def test_engine():
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    mentors_csv = os.path.join(base_dir, "mentors_prod_200_enriched.csv")
-    students_csv = os.path.join(base_dir, "students_prod_2000_enriched.csv")
+    mentors_csv = os.path.join(base_dir, "..", "data", "mentors_prod_200_enriched.csv")
+    students_csv = os.path.join(base_dir, "..", "data", "students_prod_2000_enriched.csv")
     
     # Initialize engine
     engine = MatchingEngine(mentors_csv, students_csv)

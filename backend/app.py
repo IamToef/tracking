@@ -21,9 +21,12 @@ app.add_middleware(
 
 # Paths
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-MENTORS_CSV = os.path.join(BASE_DIR, "mentors_prod_200_enriched.csv")
-STUDENTS_CSV = os.path.join(BASE_DIR, "students_prod_2000_enriched.csv")
-OVERRIDES_JSON = os.path.join(BASE_DIR, "overrides.json")
+DATA_DIR = os.path.join(BASE_DIR, "..", "data")
+FRONTEND_DIR = os.path.join(BASE_DIR, "..", "frontend")
+
+MENTORS_CSV = os.path.join(DATA_DIR, "mentors_prod_200_enriched.csv")
+STUDENTS_CSV = os.path.join(DATA_DIR, "students_prod_2000_enriched.csv")
+OVERRIDES_JSON = os.path.join(DATA_DIR, "overrides.json")
 
 # Initialize matching engine
 engine = MatchingEngine(MENTORS_CSV, STUDENTS_CSV)
@@ -56,7 +59,7 @@ class RejectionRequest(BaseModel):
 @app.get("/")
 def get_index():
     """Serves the index.html page."""
-    index_path = os.path.join(BASE_DIR, "index.html")
+    index_path = os.path.join(FRONTEND_DIR, "index.html")
     if os.path.exists(index_path):
         return HTMLResponse(content=open(index_path, encoding="utf-8").read())
     return HTMLResponse("<h1>index.html not found!</h1>")
@@ -64,7 +67,7 @@ def get_index():
 @app.get("/style.css")
 def get_css():
     """Serves style.css."""
-    css_path = os.path.join(BASE_DIR, "style.css")
+    css_path = os.path.join(FRONTEND_DIR, "style.css")
     if os.path.exists(css_path):
         return FileResponse(css_path, media_type="text/css")
     return HTMLResponse("", status_code=404)
@@ -72,7 +75,7 @@ def get_css():
 @app.get("/script.js")
 def get_js():
     """Serves script.js."""
-    js_path = os.path.join(BASE_DIR, "script.js")
+    js_path = os.path.join(FRONTEND_DIR, "script.js")
     if os.path.exists(js_path):
         return FileResponse(js_path, media_type="application/javascript")
     return HTMLResponse("", status_code=404)

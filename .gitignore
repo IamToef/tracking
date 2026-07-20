@@ -8,3 +8,5 @@ ENV/
 .env
 .vscode/
 .idea/
+walkthrough.md
+mentor-student-matching-interview-brief.md
