@@ -161,5 +161,7 @@ def perform_rejection_simulation(request: RejectionRequest):
 
 if __name__ == "__main__":
     import uvicorn
-    # Read port from env or default to 8000
-    uvicorn.run("app:app", host="127.0.0.1", port=8000, reload=True)
+    # Read host and port from environment variables or default to 0.0.0.0 and 8000
+    host = os.environ.get("HOST", "0.0.0.0")
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("app:app", host=host, port=port, reload=True)
