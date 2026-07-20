@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hệ thống Đối sánh Mentor - Student</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Cấu hình -->
+        <aside class="sidebar">
+            <div class="logo-container">
+                <div class="logo-icon">M</div>
+                <div class="logo-text">
+                    <h1>MatchEngine</h1>
+                </div>
+            </div>
+
+            <!-- Cấu hình thuật toán -->
+            <div class="sidebar-section">
+                <h2>Cấu hình tham số</h2>
+                
+                <div class="form-group">
+                    <label for="session_duration">Thời lượng buổi học (phút)</label>
+                    <input type="number" id="session_duration" value="60" min="30" max="180" step="30">
+                </div>
+
+                <div class="form-group switch-group">
+                    <label for="default_same_gender">Ưu tiên cùng giới tính</label>
+                    <label class="switch">
+                        <input type="checkbox" id="default_same_gender" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+
+                <div class="form-group">
+                    <label for="weight_theme">Trọng số chủ đề (Thematic)</label>
+                    <input type="number" id="weight_theme" value="0.6" min="0" max="1" step="0.1">
+                </div>
+
+                <div class="form-group">
+                    <label for="weight_jaccard">Trọng số Jaccard (Trùng từ)</label>
+                    <input type="number" id="weight_jaccard" value="0.4" min="0" max="1" step="0.1">
+                </div>
+
+                <div class="form-group">
+                    <label for="poor_fit_threshold">Ngưỡng cảnh báo khớp kém</label>
+                    <input type="number" id="poor_fit_threshold" value="0.2" min="0.05" max="0.5" step="0.05">
+                </div>
+            </div>
+
+            <!-- Nút hành động -->
+            <div class="sidebar-section" style="margin-top: auto; padding-top: 1rem; border-top: 1px solid var(--card-border);">
+                <button class="btn btn-primary" id="btn_run_match" onclick="runMatching()">
+                    <span>⚡ Chạy đối sánh</span>
+                </button>
+                <button class="btn btn-success" id="btn_run_simulation" onclick="runRejectionSimulation()">
+                    <span>🔄 Mô phỏng từ chối (20%)</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Màn hình chính -->
+        <main class="main-content">
+            <!-- Header bar -->
+            <header class="topbar">
+                <div class="headline">
+                    <h2>Bảng Điều Khiển Đối Sánh Cố Vấn - Học Sinh</h2>
+                    <p>Hệ thống hỗ trợ ra quyết định phân bổ học sinh THCS cho cố vấn phù hợp</p>
+                </div>
+                <div class="topbar-actions">
+                    <button class="btn btn-secondary" onclick="loadData()">
+                        <span>🔄 Tải lại dữ liệu</span>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Metrics grid -->
+            <div class="metrics-grid">
+                <div class="metric-card accent">
+                    <div class="metric-title">Tỷ lệ đối sánh (Thuật toán)</div>
+                    <div class="metric-value" id="metric_match_rate">0%</div>
+                    <div class="metric-footer" id="metric_matched_count">0 / 0 học sinh</div>
+                </div>
+                
+                <div class="metric-card success">
+                    <div class="metric-title">Điểm tương thích TB</div>
+                    <div class="metric-value" id="metric_avg_score">0.00</div>
+                    <div class="metric-footer">Mục tiêu: > 0.30</div>
+                </div>
+
+                <div class="metric-card warning">
+                    <div class="metric-title">Đối sánh khớp kém (Poor Fit)</div>
+                    <div class="metric-value" id="metric_poor_fit_count">0</div>
+                    <div class="metric-footer" id="metric_poor_fit_rate">0% của tổng đối sánh</div>
+                </div>
+
+                <div class="metric-card">
+                    <div class="metric-title">Tỷ lệ đối sánh (Baseline)</div>
+                    <div class="metric-value" id="metric_baseline_match_rate">0%</div>
+                    <div class="metric-footer" id="metric_improvement">Cải thiện: +0%</div>
+                </div>
+            </div>
+
+            <!-- Tabs -->
+            <div class="panel">
+                <div class="panel-header">
+                    <div class="tabs">
+                        <div class="tab active" onclick="switchTab('tab-matches')">Danh sách ghép cặp</div>
+                        <div class="tab" onclick="switchTab('tab-unmatched')">Học sinh chưa ghép</div>
+                        <div class="tab" onclick="switchTab('tab-overrides')">Quản lý Ghi đè (Overrides)</div>
+                        <div class="tab" onclick="switchTab('tab-simulation')">Báo cáo mô phỏng từ chối (Q4)</div>
+                    </div>
+                </div>
+
+                <!-- Tab: Matches -->
+                <div class="tab-content" id="tab-matches">
+                    <div class="table-container">
+                        <table id="matches_table">
+                            <thead>
+                                <tr>
+                                    <th>Học sinh</th>
+                                    <th>Giới tính HS</th>
+                                    <th>Cố vấn ghép cặp</th>
+                                    <th>Giới tính CV</th>
+                                    <th>Lịch học</th>
+                                    <th>Điểm tương thích</th>
+                                    <th>Giải thích lý do ghép cặp</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td colspan="7" style="text-align: center; color: var(--text-secondary);">Chưa có dữ liệu đối sánh. Nhấn "Chạy đối sánh" ở bên trái.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Tab: Unmatched -->
+                <div class="tab-content" id="tab-unmatched" style="display: none;">
+                    <div class="table-container">
+                        <table id="unmatched_table">
+                            <thead>
+                                <tr>
+                                    <th>Học sinh</th>
+                                    <th>Giới tính</th>
+                                    <th>Các khung giờ mong muốn</th>
+                                    <th>Nguyên nhân không thể đối sánh</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td colspan="4" style="text-align: center; color: var(--text-secondary);">Chưa có dữ liệu.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Tab: Overrides -->
+                <div class="tab-content" id="tab-overrides" style="display: none;">
+                    <div class="overrides-grid">
+                        <!-- Forced pairs -->
+                        <div class="override-box">
+                            <div class="override-box-header">
+                                <h4>Cưỡng ép ghép cặp (Forced Pairs)</h4>
+                            </div>
+                            <div class="override-list" id="forced_list">
+                                <!-- Items dynamic -->
+                            </div>
+                            <div class="override-form">
+                                <select id="override_force_student">
+                                    <option value="">Chọn học sinh...</option>
+                                </select>
+                                <select id="override_force_mentor">
+                                    <option value="">Chọn cố vấn...</option>
+                                </select>
+                                <button class="btn btn-secondary" onclick="addForceOverride()">Thêm</button>
+                            </div>
+                        </div>
+
+                        <!-- Blocked pairs -->
+                        <div class="override-box">
+                            <div class="override-box-header">
+                                <h4>Chặn ghép cặp (Blocked Pairs)</h4>
+                            </div>
+                            <div class="override-list" id="blocked_list">
+                                <!-- Items dynamic -->
+                            </div>
+                            <div class="override-form">
+                                <select id="override_block_student">
+                                    <option value="">Chọn học sinh...</option>
+                                </select>
+                                <select id="override_block_mentor">
+                                    <option value="">Chọn cố vấn...</option>
+                                </select>
+                                <button class="btn btn-secondary" onclick="addBlockOverride()">Thêm</button>
+                            </div>
+                        </div>
+
+                        <!-- Skipped lists -->
+                        <div class="override-box">
+                            <div class="override-box-header">
+                                <h4>Bỏ qua học sinh / cố vấn (Skip Pool)</h4>
+                            </div>
+                            <div class="override-list" id="skipped_list">
+                                <!-- Items dynamic -->
+                            </div>
+                            <div class="override-form" style="flex-direction: column;">
+                                <div style="display: flex; gap: 0.5rem;">
+                                    <select id="override_skip_student">
+                                        <option value="">Chọn học sinh...</option>
+                                    </select>
+                                    <button class="btn btn-secondary" onclick="addSkipOverride('student')">Bỏ học sinh</button>
+                                </div>
+                                <div style="display: flex; gap: 0.5rem;">
+                                    <select id="override_skip_mentor">
+                                        <option value="">Chọn cố vấn...</option>
+                                    </select>
+                                    <button class="btn btn-secondary" onclick="addSkipOverride('mentor')">Bỏ cố vấn</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab: Simulation -->
+                <div class="tab-content" id="tab-simulation" style="display: none;">
+                    <div class="comparison-container">
+                        <!-- Before Rejection -->
+                        <div class="override-box" style="background: rgba(16, 185, 129, 0.05); border-color: rgba(16, 185, 129, 0.2);">
+                            <h4 style="color: var(--success-color); margin-bottom: 1rem;">Trước khi từ chối (Initial Match)</h4>
+                            <div class="form-group" style="margin-bottom: 0.5rem;">
+                                <label>Tỷ lệ đối sánh:</label>
+                                <span id="sim_match_rate_before" style="font-size: 1.25rem; font-weight: bold;">0%</span>
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0.5rem;">
+                                <label>Điểm tương thích trung bình:</label>
+                                <span id="sim_avg_score_before" style="font-size: 1.25rem; font-weight: bold;">0.00</span>
+                            </div>
+                            <div class="form-group">
+                                <label>Số học sinh ghép thành công:</label>
+                                <span id="sim_count_before" style="font-size: 1.25rem; font-weight: bold;">0 / 0</span>
+                            </div>
+                        </div>
+
+                        <!-- After Rejection -->
+                        <div class="override-box" style="background: rgba(239, 68, 68, 0.05); border-color: rgba(239, 68, 68, 0.2);">
+                            <h4 style="color: var(--error-color); margin-bottom: 1rem;">Sau khi bị từ chối 20% & Đối sánh lại</h4>
+                            <div class="form-group" style="margin-bottom: 0.5rem;">
+                                <label>Số học sinh từ chối cố vấn:</label>
+                                <span id="sim_rejected_count" style="font-size: 1.25rem; font-weight: bold; color: var(--warning-color);">0</span>
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0.5rem;">
+                                <label>Ghép đôi lại thành công:</label>
+                                <span id="sim_rematch_success" style="font-size: 1.25rem; font-weight: bold; color: var(--success-color);">0</span>
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0.5rem;">
+                                <label>Không thể ghép đôi lại:</label>
+                                <span id="sim_rematch_fail" style="font-size: 1.25rem; font-weight: bold; color: var(--error-color);">0</span>
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0.5rem;">
+                                <label>Tỷ lệ đối sánh chung cuộc:</label>
+                                <span id="sim_match_rate_after" style="font-size: 1.25rem; font-weight: bold;">0%</span>
+                            </div>
+                            <div class="form-group">
+                                <label>Điểm tương thích chung cuộc:</label>
+                                <span id="sim_avg_score_after" style="font-size: 1.25rem; font-weight: bold;">0.00</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 1.5rem;">
+                        <h4 style="margin-bottom: 0.75rem;">Chi tiết danh sách học sinh bị từ chối và kết quả ghép lại:</h4>
+                        <div class="table-container">
+                            <table id="simulation_table">
+                                <thead>
+                                    <tr>
+                                        <th>Học sinh</th>
+                                        <th>Cố vấn cũ (Bị từ chối)</th>
+                                        <th>Cố vấn mới (Ghép lại)</th>
+                                        <th>Lịch học mới</th>
+                                        <th>Điểm tương thích mới</th>
+                                        <th>Trạng thái / Nguyên nhân</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td colspan="6" style="text-align: center; color: var(--text-secondary);">Chưa chạy mô phỏng từ chối. Nhấn "Mô phỏng từ chối (20%)" ở cột bên trái.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
