@@ -6,13 +6,13 @@ Chúng ta đã hoàn thành việc chuẩn bị và cấu hình dự án để s
 
 ## 🛠️ Các Thay Đổi Đã Thực Hiện
 
-### 1. Tạo tệp [requirements.txt](file:///d:/code/tracking/requirements.txt) [NEW]
+### 1. Tạo tệp [requirements.txt](file:///d:/baihoc/Pet%20project/tracking/requirements.txt) [NEW]
 Đã khai báo các thư viện cần thiết phục vụ cho việc build ứng dụng trên máy chủ đám mây:
 * `fastapi==0.111.0`
 * `uvicorn==0.30.1`
 * `pydantic==2.7.4`
 
-### 2. Cập nhật cấu hình khởi chạy trong [app.py](file:///d:/code/tracking/app.py) [MODIFY]
+### 2. Cập nhật cấu hình khởi chạy trong [app.py](file:///d:/baihoc/Pet%20project/tracking/app.py) [MODIFY]
 Thay đổi cách uvicorn khởi chạy để tự động nhận cấu hình cổng và host động được cấp phát bởi các nền tảng đám mây:
 ```python
 if __name__ == "__main__":
@@ -22,6 +22,10 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run("app:app", host=host, port=port, reload=True)
 ```
+
+### 3. Tạo tệp [.python-version](file:///d:/baihoc/Pet%20project/tracking/.python-version) [NEW]
+Chỉ định rõ phiên bản Python là `3.11.9`.
+* **Lý do:** Mặc định Render tự động chọn phiên bản Python mới nhất (ở đây là Python 3.14). Do Python 3.14 quá mới nên chưa có gói nhị phân dựng sẵn (wheel) cho `pydantic-core`, buộc pip phải biên dịch từ mã nguồn (Rust/Maturin) trong quá trình cài đặt. Khi đó, trình cài đặt cố gắng ghi cache vào thư mục hệ thống `/usr/local/cargo/registry/cache` và bị lỗi quyền ghi (`Read-only file system`). Việc ghim phiên bản Python `3.11.9` giúp Render sử dụng trực tiếp bản build sẵn có một cách trơn tru và an toàn.
 
 ---
 
@@ -39,10 +43,10 @@ if __name__ == "__main__":
 Để đưa ứng dụng lên chạy chính thức và lấy URL gửi cho người ngoài Hà Nội test, bạn chỉ cần thực hiện 4 bước đơn giản sau:
 
 ### Bước 1: Đẩy code mới lên GitHub
-Mở Git Bash hoặc Terminal tại thư mục `d:\code\tracking` và chạy các lệnh:
+Mở Git Bash hoặc Terminal tại thư mục của dự án và chạy các lệnh:
 ```bash
-git add requirements.txt app.py
-git commit -m "Configure app for cloud deployment"
+git add requirements.txt app.py .python-version
+git commit -m "Configure app and pin Python version for cloud deployment"
 git push origin main
 ```
 *(Nếu bạn chưa kết nối với repository GitHub của mình, hãy tạo một repo trống trên GitHub rồi push code lên nhé).*
