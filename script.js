@@ -1,4 +1,6 @@
-const API_URL = "/api";
+const API_URL = window.location.protocol === "file:"
+    ? "https://tracking-suoc.onrender.com/api"
+    : "/api";
 
 // State
 let rawData = { mentors: [], students: [] };
