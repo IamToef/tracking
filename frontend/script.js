@@ -1,4 +1,7 @@
-const API_URL = window.location.protocol === "file:"
+const API_URL = (window.location.protocol === "file:" || 
+                 (!window.location.hostname.includes("localhost") && 
+                  !window.location.hostname.includes("127.0.0.1") && 
+                  !window.location.hostname.includes("onrender.com")))
     ? "https://tracking-suoc.onrender.com/api"
     : "/api";
 
@@ -7,6 +10,9 @@ let rawData = { mentors: [], students: [] };
 let overrides = { forced: [], blocked: [], skipped_students: [], skipped_mentors: [] };
 let currentAssignments = [];
 let currentUnassigned = [];
+let matchCurrentPage = 1;
+let unmatchedCurrentPage = 1;
+const PAGE_SIZE = 50;
 
 const TARGET_SELECTS = [
     "override_force_student",
@@ -58,6 +64,76 @@ function removeVietnameseTones(str) {
     return str.trim();
 }
 
+// Render Custom Dropdown options (limited & on-demand to optimize DOM performance)
+function renderCustomSelectOptions(selectId, filterText = "") {
+    const select = document.getElementById(selectId);
+    const container = document.getElementById(`custom_${selectId}`);
+    if (!select || !container) return;
+
+    const trigger = container.querySelector(".custom-select-trigger");
+    const optionsContainer = container.querySelector(".custom-select-options");
+    optionsContainer.innerHTML = "";
+
+    const query = removeVietnameseTones(filterText.toLowerCase());
+    let renderedCount = 0;
+    const MAX_RENDER = 50; // ponytail: limit elements in DOM to prevent freezing the browser
+
+    // Render the default placeholder option if it matches
+    const firstOpt = select.options[0];
+    if (firstOpt && firstOpt.value === "") {
+        const item = document.createElement("div");
+        item.className = "custom-select-option";
+        if (select.value === "") {
+            item.classList.add("selected");
+        }
+        item.textContent = firstOpt.textContent;
+        item.dataset.value = "";
+        item.addEventListener("click", (e) => {
+            e.stopPropagation();
+            select.value = "";
+            select.dispatchEvent(new Event("change"));
+            trigger.textContent = firstOpt.textContent;
+            container.classList.remove("open");
+            renderCustomSelectOptions(selectId, "");
+        });
+        optionsContainer.appendChild(item);
+    }
+
+    // Render filtered options up to MAX_RENDER
+    for (let i = 0; i < select.options.length; i++) {
+        const opt = select.options[i];
+        if (opt.value === "") continue;
+
+        const text = opt.textContent;
+        const normalizedText = removeVietnameseTones(text.toLowerCase());
+
+        if (normalizedText.includes(query)) {
+            const item = document.createElement("div");
+            item.className = "custom-select-option";
+            if (opt.selected) {
+                item.classList.add("selected");
+                trigger.textContent = text;
+            }
+            item.textContent = text;
+            item.dataset.value = opt.value;
+
+            item.addEventListener("click", (e) => {
+                e.stopPropagation();
+                select.value = opt.value;
+                select.dispatchEvent(new Event("change"));
+
+                trigger.textContent = text;
+                container.classList.remove("open");
+                renderCustomSelectOptions(selectId, "");
+            });
+
+            optionsContainer.appendChild(item);
+            renderedCount++;
+            if (renderedCount >= MAX_RENDER) break;
+        }
+    }
+}
+
 // Initialize Custom Searchable Dropdown
 function initSearchableDropdown(selectId) {
     const select = document.getElementById(selectId);
@@ -106,16 +182,7 @@ function initSearchableDropdown(selectId) {
     });
 
     searchInput.addEventListener("input", () => {
-        const query = removeVietnameseTones(searchInput.value.toLowerCase());
-        const options = optionsContainer.querySelectorAll(".custom-select-option");
-        options.forEach(opt => {
-            const text = removeVietnameseTones(opt.textContent.toLowerCase());
-            if (text.includes(query)) {
-                opt.classList.remove("hidden");
-            } else {
-                opt.classList.add("hidden");
-            }
-        });
+        renderCustomSelectOptions(selectId, searchInput.value);
     });
 }
 
@@ -126,42 +193,15 @@ function refreshCustomSelect(selectId) {
     if (!select || !container) return;
 
     const trigger = container.querySelector(".custom-select-trigger");
-    const optionsContainer = container.querySelector(".custom-select-options");
     const searchInput = container.querySelector(".custom-select-search");
 
-    optionsContainer.innerHTML = "";
     searchInput.value = "";
+    
+    // Perform initial render (first 50 options)
+    renderCustomSelectOptions(selectId, "");
 
-    Array.from(select.options).forEach((opt) => {
-        const item = document.createElement("div");
-        item.className = "custom-select-option";
-        if (opt.selected) {
-            item.classList.add("selected");
-            trigger.textContent = opt.textContent;
-        }
-        item.textContent = opt.textContent;
-        item.dataset.value = opt.value;
-
-        item.addEventListener("click", (e) => {
-            e.stopPropagation();
-            select.value = opt.value;
-            select.dispatchEvent(new Event("change"));
-
-            trigger.textContent = opt.textContent;
-            optionsContainer.querySelectorAll(".custom-select-option").forEach(o => o.classList.remove("selected"));
-            item.classList.add("selected");
-
-            container.classList.remove("open");
-            searchInput.value = "";
-            optionsContainer.querySelectorAll(".custom-select-option").forEach(o => o.classList.remove("hidden"));
-        });
-
-        optionsContainer.appendChild(item);
-    });
-
-    if (select.selectedIndex === -1 || select.value === "") {
-        trigger.textContent = select.options[0]?.textContent || "Chọn...";
-    }
+    const selectedOpt = select.options[select.selectedIndex];
+    trigger.textContent = selectedOpt ? selectedOpt.textContent : (select.options[0]?.textContent || "Chọn...");
 }
 
 // Initialize
@@ -429,6 +469,10 @@ async function runMatching() {
         currentAssignments = data.assignments;
         currentUnassigned = data.unassigned;
         
+        // Reset pagination pages
+        matchCurrentPage = 1;
+        unmatchedCurrentPage = 1;
+        
         updateMetrics(data.report);
         renderMatchesTable();
         renderUnmatchedTable();
@@ -494,17 +538,69 @@ function updateMetrics(report) {
     document.getElementById("metric_improvement").textContent = improvementText;
 }
 
-// Render Assignments Table
+// Render Pagination Controls
+function updatePaginationControls(type, totalItems, currentPage, onPageChange) {
+    const container = document.getElementById(`${type}_pagination`);
+    if (!container) return;
+
+    if (totalItems <= PAGE_SIZE) {
+        container.innerHTML = "";
+        return;
+    }
+
+    const totalPages = Math.ceil(totalItems / PAGE_SIZE);
+
+    container.innerHTML = `
+        <div class="pagination">
+            <button class="btn btn-secondary btn-sm" ${currentPage === 1 ? "disabled" : ""} id="${type}_prev">⬅️ Trước</button>
+            <span class="pagination-info">Trang ${currentPage} / ${totalPages} (Tổng: ${totalItems})</span>
+            <button class="btn btn-secondary btn-sm" ${currentPage === totalPages ? "disabled" : ""} id="${type}_next">Sau ➡️</button>
+        </div>
+    `;
+
+    const prevBtn = container.querySelector(`#${type}_prev`);
+    const nextBtn = container.querySelector(`#${type}_next`);
+
+    if (prevBtn) {
+        prevBtn.addEventListener("click", () => {
+            if (currentPage > 1) {
+                onPageChange(currentPage - 1);
+            }
+        });
+    }
+
+    if (nextBtn) {
+        nextBtn.addEventListener("click", () => {
+            if (currentPage < totalPages) {
+                onPageChange(currentPage + 1);
+            }
+        });
+    }
+}
+
+// Render Assignments Table with pagination to optimize DOM performance
 function renderMatchesTable() {
     const tbody = document.querySelector("#matches_table tbody");
     tbody.innerHTML = "";
     
     if (currentAssignments.length === 0) {
         tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-secondary);">Chưa có dữ liệu ghép cặp. Nhấn "Chạy đối sánh".</td></tr>';
+        updatePaginationControls("matches", 0, 1, () => {});
         return;
     }
 
-    currentAssignments.forEach(a => {
+    const totalItems = currentAssignments.length;
+    const totalPages = Math.ceil(totalItems / PAGE_SIZE);
+    
+    if (matchCurrentPage > totalPages) matchCurrentPage = totalPages;
+    if (matchCurrentPage < 1) matchCurrentPage = 1;
+
+    const start = (matchCurrentPage - 1) * PAGE_SIZE;
+    const end = Math.min(start + PAGE_SIZE, totalItems);
+    
+    const pageAssignments = currentAssignments.slice(start, end);
+
+    pageAssignments.forEach(a => {
         const tr = document.createElement("tr");
         
         // Badges
@@ -533,19 +629,36 @@ function renderMatchesTable() {
         `;
         tbody.appendChild(tr);
     });
+
+    updatePaginationControls("matches", totalItems, matchCurrentPage, (newPage) => {
+        matchCurrentPage = newPage;
+        renderMatchesTable();
+    });
 }
 
-// Render Unmatched Table
+// Render Unmatched Table with pagination to optimize DOM performance
 function renderUnmatchedTable() {
     const tbody = document.querySelector("#unmatched_table tbody");
     tbody.innerHTML = "";
     
     if (currentUnassigned.length === 0) {
         tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--success-color); font-weight: 500;">Hoàn hảo! 100% học sinh đã được đối sánh thành công.</td></tr>';
+        updatePaginationControls("unmatched", 0, 1, () => {});
         return;
     }
 
-    currentUnassigned.forEach(u => {
+    const totalItems = currentUnassigned.length;
+    const totalPages = Math.ceil(totalItems / PAGE_SIZE);
+
+    if (unmatchedCurrentPage > totalPages) unmatchedCurrentPage = totalPages;
+    if (unmatchedCurrentPage < 1) unmatchedCurrentPage = 1;
+
+    const start = (unmatchedCurrentPage - 1) * PAGE_SIZE;
+    const end = Math.min(start + PAGE_SIZE, totalItems);
+
+    const pageUnassigned = currentUnassigned.slice(start, end);
+
+    pageUnassigned.forEach(u => {
         const tr = document.createElement("tr");
         const slotsText = u.slots ? u.slots.map(s => `${translateDay(s.day)} ${s.start_time}`).join(", ") : "N/A";
         const genderBadge = `<span class="badge badge-gender-${u.student_gender.toLowerCase()}">${u.student_gender}</span>`;
@@ -557,6 +670,11 @@ function renderUnmatchedTable() {
             <td style="color: var(--error-color); font-weight: 500;">${u.reason}</td>
         `;
         tbody.appendChild(tr);
+    });
+
+    updatePaginationControls("unmatched", totalItems, unmatchedCurrentPage, (newPage) => {
+        unmatchedCurrentPage = newPage;
+        renderUnmatchedTable();
     });
 }
 
