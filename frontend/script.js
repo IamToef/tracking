@@ -8,33 +8,200 @@ let overrides = { forced: [], blocked: [], skipped_students: [], skipped_mentors
 let currentAssignments = [];
 let currentUnassigned = [];
 
+const TARGET_SELECTS = [
+    "override_force_student",
+    "override_force_mentor",
+    "override_block_student",
+    "override_block_mentor",
+    "override_skip_student",
+    "override_skip_mentor"
+];
+
+let loadingCount = 0;
+
+function showLoading() {
+    loadingCount++;
+    if (loadingCount === 1) {
+        const overlay = document.getElementById("loading_overlay");
+        if (overlay) overlay.classList.add("active");
+    }
+}
+
+function hideLoading() {
+    loadingCount--;
+    if (loadingCount <= 0) {
+        loadingCount = 0;
+        const overlay = document.getElementById("loading_overlay");
+        if (overlay) overlay.classList.remove("active");
+    }
+}
+
+// Remove Vietnamese tones for search function
+function removeVietnameseTones(str) {
+    str = str.replace(/à|á|ạ|ả|ã|â|ầ|ấ|ậ|ẩ|ẫ|ă|ằ|ắ|ặ|ẳ|ẵ/g, "a");
+    str = str.replace(/è|é|ẹ|ẻ|ẽ|ê|ề|ế|ệ|ể|ễ/g, "e");
+    str = str.replace(/ì|í|ị|ỉ|ĩ/g, "i");
+    str = str.replace(/ò|ó|ọ|ỏ|õ|ô|ồ|ố|ộ|ổ|ỗ|ơ|ờ|ớ|ợ|ở|ỡ/g, "o");
+    str = str.replace(/ù|ú|ụ|ủ|ũ|ư|ừ|ứ|ự|ử|ữ/g, "u");
+    str = str.replace(/ỳ|ý|ỵ|ỷ|ỹ/g, "y");
+    str = str.replace(/đ/g, "d");
+    str = str.replace(/À|Á|Ạ|Ả|Ã|Â|Ầ|Ấ|Ậ|Ẩ|Ẫ|Ă|Ằ|Ắ|Ặ|Ẳ|Ẵ/g, "A");
+    str = str.replace(/È|É|Ẹ|Ẻ|Ẽ|Ê|Ề|Ế|Ệ|Ể|Ễ/g, "E");
+    str = str.replace(/Ì|Í|Ị|Ỉ|Ĩ/g, "I");
+    str = str.replace(/Ò|Ó|Ọ|Ỏ|Õ|Ô|Ồ|Ố|Ộ|Ổ|Ỗ|Ơ|Ờ|Ớ|Ợ|Ở|Ỡ/g, "O");
+    str = str.replace(/Ù|Ú|Ụ|Ủ|Ũ|Ư|Ừ|Ứ|Ự|Ử|Ữ/g, "U");
+    str = str.replace(/Ỳ|Ý|Ỵ|Ỷ|Ỹ/g, "Y");
+    str = str.replace(/Đ/g, "D");
+    str = str.replace(/\u0300|\u0301|\u0303|\u0309|\u0323/g, ""); 
+    str = str.replace(/\u02C6|\u0306|\u031B/g, ""); 
+    str = str.replace(/ + /g, " ");
+    return str.trim();
+}
+
+// Initialize Custom Searchable Dropdown
+function initSearchableDropdown(selectId) {
+    const select = document.getElementById(selectId);
+    if (!select) return;
+
+    select.style.display = 'none';
+
+    const container = document.createElement("div");
+    container.className = "custom-select-container";
+    container.id = `custom_${selectId}`;
+
+    const trigger = document.createElement("div");
+    trigger.className = "custom-select-trigger";
+    trigger.textContent = select.options[select.selectedIndex]?.textContent || "Chọn...";
+    container.appendChild(trigger);
+
+    const dropdown = document.createElement("div");
+    dropdown.className = "custom-select-dropdown";
+
+    const searchInput = document.createElement("input");
+    searchInput.type = "text";
+    searchInput.className = "custom-select-search";
+    searchInput.placeholder = "Nhập để tìm kiếm...";
+    dropdown.appendChild(searchInput);
+
+    const optionsContainer = document.createElement("div");
+    optionsContainer.className = "custom-select-options";
+    dropdown.appendChild(optionsContainer);
+
+    container.appendChild(dropdown);
+    select.parentNode.insertBefore(container, select);
+
+    trigger.addEventListener("click", (e) => {
+        e.stopPropagation();
+        document.querySelectorAll(".custom-select-container").forEach(c => {
+            if (c !== container) c.classList.remove("open");
+        });
+        container.classList.toggle("open");
+        if (container.classList.contains("open")) {
+            searchInput.focus();
+        }
+    });
+
+    searchInput.addEventListener("click", (e) => {
+        e.stopPropagation();
+    });
+
+    searchInput.addEventListener("input", () => {
+        const query = removeVietnameseTones(searchInput.value.toLowerCase());
+        const options = optionsContainer.querySelectorAll(".custom-select-option");
+        options.forEach(opt => {
+            const text = removeVietnameseTones(opt.textContent.toLowerCase());
+            if (text.includes(query)) {
+                opt.classList.remove("hidden");
+            } else {
+                opt.classList.add("hidden");
+            }
+        });
+    });
+}
+
+// Refresh Custom Dropdown options
+function refreshCustomSelect(selectId) {
+    const select = document.getElementById(selectId);
+    const container = document.getElementById(`custom_${selectId}`);
+    if (!select || !container) return;
+
+    const trigger = container.querySelector(".custom-select-trigger");
+    const optionsContainer = container.querySelector(".custom-select-options");
+    const searchInput = container.querySelector(".custom-select-search");
+
+    optionsContainer.innerHTML = "";
+    searchInput.value = "";
+
+    Array.from(select.options).forEach((opt) => {
+        const item = document.createElement("div");
+        item.className = "custom-select-option";
+        if (opt.selected) {
+            item.classList.add("selected");
+            trigger.textContent = opt.textContent;
+        }
+        item.textContent = opt.textContent;
+        item.dataset.value = opt.value;
+
+        item.addEventListener("click", (e) => {
+            e.stopPropagation();
+            select.value = opt.value;
+            select.dispatchEvent(new Event("change"));
+
+            trigger.textContent = opt.textContent;
+            optionsContainer.querySelectorAll(".custom-select-option").forEach(o => o.classList.remove("selected"));
+            item.classList.add("selected");
+
+            container.classList.remove("open");
+            searchInput.value = "";
+            optionsContainer.querySelectorAll(".custom-select-option").forEach(o => o.classList.remove("hidden"));
+        });
+
+        optionsContainer.appendChild(item);
+    });
+
+    if (select.selectedIndex === -1 || select.value === "") {
+        trigger.textContent = select.options[0]?.textContent || "Chọn...";
+    }
+}
+
 // Initialize
 document.addEventListener("DOMContentLoaded", async () => {
+    TARGET_SELECTS.forEach(id => initSearchableDropdown(id));
+
+    document.addEventListener("click", () => {
+        document.querySelectorAll(".custom-select-container").forEach(c => c.classList.remove("open"));
+    });
+
     await loadData();
     await loadOverrides();
-    // Run initial match
     await runMatching();
 });
 
 // Load raw student/mentor data from API
 async function loadData() {
+    showLoading();
     try {
         const res = await fetch(`${API_URL}/data`);
         rawData = await res.json();
         populateSelectBoxes();
     } catch (err) {
         console.error("Error loading raw data:", err);
+    } finally {
+        hideLoading();
     }
 }
 
 // Load overrides configuration
 async function loadOverrides() {
+    showLoading();
     try {
         const res = await fetch(`${API_URL}/overrides`);
         overrides = await res.json();
         renderOverridesList();
     } catch (err) {
         console.error("Error loading overrides:", err);
+    } finally {
+        hideLoading();
     }
 }
 
@@ -62,6 +229,7 @@ function populateSelectBoxes() {
                 opt.textContent = `${s.name} (${s.gender})`;
                 sel.appendChild(opt);
             });
+            refreshCustomSelect(sel.id);
         }
     });
 
@@ -74,6 +242,7 @@ function populateSelectBoxes() {
                 opt.textContent = `${m.name} (${m.gender})`;
                 sel.appendChild(opt);
             });
+            refreshCustomSelect(sel.id);
         }
     });
 }
@@ -151,8 +320,10 @@ function renderOverridesList() {
 
 // Add forced pair override
 async function addForceOverride() {
-    const sId = document.getElementById("override_force_student").value;
-    const mId = document.getElementById("override_force_mentor").value;
+    const sSelect = document.getElementById("override_force_student");
+    const mSelect = document.getElementById("override_force_mentor");
+    const sId = sSelect.value;
+    const mId = mSelect.value;
     if (!sId || !mId) return alert("Vui lòng chọn cả học sinh và cố vấn!");
     
     // Check if student already forced or blocked
@@ -162,12 +333,20 @@ async function addForceOverride() {
     
     overrides.forced.push([sId, mId]);
     await saveOverrides();
+
+    // Reset select inputs
+    sSelect.value = "";
+    mSelect.value = "";
+    refreshCustomSelect("override_force_student");
+    refreshCustomSelect("override_force_mentor");
 }
 
 // Add blocked pair override
 async function addBlockOverride() {
-    const sId = document.getElementById("override_block_student").value;
-    const mId = document.getElementById("override_block_mentor").value;
+    const sSelect = document.getElementById("override_block_student");
+    const mSelect = document.getElementById("override_block_mentor");
+    const sId = sSelect.value;
+    const mId = mSelect.value;
     if (!sId || !mId) return alert("Vui lòng chọn cả học sinh và cố vấn!");
     
     if (overrides.blocked.some(pair => pair[0] === sId && pair[1] === mId)) {
@@ -176,22 +355,35 @@ async function addBlockOverride() {
     
     overrides.blocked.push([sId, mId]);
     await saveOverrides();
+
+    // Reset select inputs
+    sSelect.value = "";
+    mSelect.value = "";
+    refreshCustomSelect("override_block_student");
+    refreshCustomSelect("override_block_mentor");
 }
 
 // Add skip pool override
 async function addSkipOverride(type) {
     if (type === 'student') {
-        const sId = document.getElementById("override_skip_student").value;
+        const sSelect = document.getElementById("override_skip_student");
+        const sId = sSelect.value;
         if (!sId) return alert("Vui lòng chọn học sinh!");
         if (overrides.skipped_students.includes(sId)) return alert("Học sinh này đã nằm trong danh sách bỏ qua!");
         overrides.skipped_students.push(sId);
+        await saveOverrides();
+        sSelect.value = "";
+        refreshCustomSelect("override_skip_student");
     } else {
-        const mId = document.getElementById("override_skip_mentor").value;
+        const mSelect = document.getElementById("override_skip_mentor");
+        const mId = mSelect.value;
         if (!mId) return alert("Vui lòng chọn cố vấn!");
         if (overrides.skipped_mentors.includes(mId)) return alert("Cố vấn này đã nằm trong danh sách bỏ qua!");
         overrides.skipped_mentors.push(mId);
+        await saveOverrides();
+        mSelect.value = "";
+        refreshCustomSelect("override_skip_mentor");
     }
-    await saveOverrides();
 }
 
 // Remove override and save
@@ -202,6 +394,7 @@ async function removeOverride(key, idx) {
 
 // Save overrides configuration to backend
 async function saveOverrides() {
+    showLoading();
     try {
         const res = await fetch(`${API_URL}/overrides`, {
             method: "POST",
@@ -216,11 +409,14 @@ async function saveOverrides() {
         }
     } catch (err) {
         console.error("Failed to save overrides:", err);
+    } finally {
+        hideLoading();
     }
 }
 
 // Run matching algorithm
 async function runMatching() {
+    showLoading();
     const config = getMatchConfig();
     try {
         const res = await fetch(`${API_URL}/match`, {
@@ -238,6 +434,8 @@ async function runMatching() {
         renderUnmatchedTable();
     } catch (err) {
         console.error("Error running matching:", err);
+    } finally {
+        hideLoading();
     }
 }
 
@@ -246,6 +444,7 @@ async function runRejectionSimulation() {
     if (currentAssignments.length === 0) {
         return alert("Vui lòng nhấn 'Chạy đối sánh' trước khi thực hiện mô phỏng từ chối!");
     }
+    showLoading();
     const config = getMatchConfig();
     try {
         const res = await fetch(`${API_URL}/simulate-rejection`, {
@@ -265,6 +464,8 @@ async function runRejectionSimulation() {
         renderSimulationPanel(data);
     } catch (err) {
         console.error("Error running rejection simulation:", err);
+    } finally {
+        hideLoading();
     }
 }
 

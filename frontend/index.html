@@ -35,18 +35,21 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="weight_theme">Trọng số chủ đề (Thematic)</label>
+                    <label for="weight_theme">Độ ưu tiên lĩnh vực chuyên môn (Theme weight)</label>
                     <input type="number" id="weight_theme" value="0.6" min="0" max="1" step="0.1">
+                    <span class="help-text">Mức độ ưu tiên khớp giữa sở thích/chủ đề học của học sinh và thế mạnh của cố vấn.</span>
                 </div>
 
                 <div class="form-group">
-                    <label for="weight_jaccard">Trọng số Jaccard (Trùng từ)</label>
+                    <label for="weight_jaccard">Độ ưu tiên từ khóa mô tả (Keyword weight)</label>
                     <input type="number" id="weight_jaccard" value="0.4" min="0" max="1" step="0.1">
+                    <span class="help-text">Mức độ ưu tiên dựa trên tỷ lệ trùng từ khóa tự mô tả trong đơn đăng ký của cả hai.</span>
                 </div>
 
                 <div class="form-group">
-                    <label for="poor_fit_threshold">Ngưỡng cảnh báo khớp kém</label>
+                    <label for="poor_fit_threshold">Ngưỡng cảnh báo độ tương thích thấp</label>
                     <input type="number" id="poor_fit_threshold" value="0.2" min="0.05" max="0.5" step="0.05">
+                    <span class="help-text">Nếu điểm tương thích dưới ngưỡng này, hệ thống sẽ cảnh báo khớp kém (Poor Fit).</span>
                 </div>
             </div>
 
@@ -297,6 +300,14 @@
                 </div>
             </div>
         </main>
+    </div>
+
+    <!-- Loading overlay -->
+    <div id="loading_overlay" class="loading-overlay">
+        <div class="loading-spinner-container">
+            <div class="spinner"></div>
+            <p>Hệ thống đang xử lý, vui lòng chờ trong giây lát...</p>
+        </div>
     </div>
 
     <script src="script.js"></script>

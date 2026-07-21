@@ -130,12 +130,53 @@ Khởi chạy server FastAPI:
 ```powershell
 & "D:\baihoc\Pet project\Car_db\venv\Scripts\python.exe" "d:\baihoc\Pet project\tracking\backend\app.py"
 ```
-Truy cập trang quản trị trực quan tại địa chỉ: **`http://127.0.0.1:8000`**
+Truy cập giao diện quản trị tại địa chỉ: **`http://127.0.0.1:8000`**
 
-Giao diện Dashboard cung cấp các tính năng:
-* **Tùy chỉnh tham số thuật toán:** Thay đổi thời lượng buổi học, độ ưu tiên giới tính và trọng số tương hợp văn bản (NLP Weights) [(index.html:45)](file:///d:/baihoc/Pet%20project/tracking/index.html#L45).
-* **Quản lý Overrides:** Cấu hình cưỡng ép ghép đôi hoặc chặn cặp trực quan trên giao diện [(index.html:80)](file:///d:/baihoc/Pet%20project/tracking/index.html#L80).
-* **Mô phỏng Q4 Rejection:** Mô phỏng tình huống ngẫu nhiên 20% học sinh từ chối cố vấn và tự động tìm phương án thay thế [(index.html:120)](file:///d:/baihoc/Pet%20project/tracking/index.html#L120).
+---
+
+## 📖 Hướng Dẫn Sử Dụng Dashboard (How to Use)
+
+Giao diện Dashboard giúp quản lý thuật toán đối sánh cố vấn - học sinh trực quan qua 4 chức năng chính:
+
+### 1. Cấu hình tham số thuật toán (Sidebar bên trái)
+Bạn có thể tinh chỉnh các thông số để tối ưu hóa kết quả đối sánh:
+* **Thời lượng buổi học (phút)**: Thời gian của một buổi học (mặc định là 60 phút). Hệ thống sẽ căn cứ vào đây để tính toán các khung giờ trống của cố vấn.
+* **Ưu tiên cùng giới tính**: Bật để ưu tiên ghép học sinh nữ với cố vấn nữ, học sinh nam với cố vấn nam.
+* **Độ ưu tiên lĩnh vực chuyên môn (Theme weight)**: Thiết lập mức độ quan trọng của việc trùng khớp chủ đề học tập lớn. Trọng số càng cao, thuật toán càng ưu tiên ghép đôi những người có cùng mối quan tâm lớn (ví dụ: Toán học, Lập trình).
+* **Độ ưu tiên từ khóa mô tả (Keyword weight)**: Thiết lập mức độ quan trọng của các từ khóa tự do trong đơn đăng ký. Trọng số này bổ trợ cho việc so khớp sở thích chi tiết.
+* **Ngưỡng cảnh báo độ tương thích thấp**: Điểm tương thích được tính từ 0 đến 1. Bất kỳ cặp ghép đôi nào có điểm dưới ngưỡng này sẽ bị hệ thống gắn nhãn cảnh báo **Poor Fit ⚠️** trên bảng kết quả để người điều hành kiểm duyệt thủ công.
+
+> [!TIP]
+> Sau khi thay đổi bất kỳ tham số nào, hãy nhấn nút **⚡ Chạy đối sánh** ở góc dưới Sidebar để áp dụng cấu hình mới và cập nhật kết quả tức thì.
+
+### 2. Xem kết quả đối sánh (Bảng điều khiển chính)
+* **Các chỉ số thống kê (Metrics Grid)**: 
+  * *Tỷ lệ đối sánh*: Tỷ lệ % học sinh được ghép đôi thành công.
+  * *Điểm tương thích TB*: Điểm chất lượng trung bình của toàn bộ các cặp.
+  * *Đối sánh khớp kém (Poor Fit)*: Số lượng và tỷ lệ các cặp dưới ngưỡng tương thích yêu cầu.
+  * *So sánh với Baseline*: Tốc độ và tỷ lệ cải thiện của thuật toán Heuristic so với cách ghép đôi ngẫu nhiên cơ bản (Baseline).
+* **Tab "Danh sách ghép cặp"**: Liệt kê chi tiết học sinh, cố vấn được ghép, khung giờ học cụ thể, điểm số tương thích và phần giải thích lý do cụ thể vì sao thuật toán ghép cặp họ với nhau.
+* **Tab "Học sinh chưa ghép"**: Hiển thị danh sách học sinh không tìm được cố vấn phù hợp cùng nguyên nhân chi tiết (ví dụ: Lệch lịch học hoàn toàn, hoặc do ràng buộc giới tính không thể thỏa mãn).
+
+### 3. Cấu hình quy tắc ghi đè (Tab "Quản lý Ghi đè - Overrides")
+Tính năng này cho phép quản trị viên can thiệp thủ công vào kết quả đối sánh:
+* **Cưỡng ép ghép cặp (Forced Pairs)**: Bắt buộc học sinh $A$ phải học với cố vấn $B$. Khi cấu hình quy tắc này, thuật toán sẽ bỏ qua tính toán tương thích và luôn cố định cặp này trước khi chạy đối sánh cho các học sinh khác.
+* **Chặn ghép cặp (Blocked Pairs)**: Cấm không cho học sinh $A$ ghép cặp với cố vấn $B$. Thuật toán sẽ tránh ghép đôi họ dù họ có trùng lịch hay cùng sở thích.
+* **Bỏ qua học sinh / cố vấn (Skip Pool)**: Loại một học sinh hoặc cố vấn ra khỏi hàng đợi đối sánh (ví dụ: Học sinh xin nghỉ học tạm thời, cố vấn bận đột xuất).
+
+**Cách sử dụng Dropdown Tìm Kiếm Nhanh:**
+1. Nhấp vào ô chọn học sinh hoặc cố vấn.
+2. Gõ tên người cần tìm vào ô tìm kiếm ở đầu danh sách (hỗ trợ gõ tiếng Việt không dấu). Danh sách sẽ tự động lọc người dùng khớp với từ khóa.
+3. Chọn người cần thiết lập và nhấn nút **Thêm** (hoặc **Bỏ học sinh** / **Bỏ cố vấn**).
+4. Hệ thống sẽ tự động gửi cấu hình lên server, lưu trữ vào tệp `overrides.json`, và chạy lại thuật toán đối sánh ngay lập tức để cập nhật kết quả mới trên màn hình.
+5. Để xóa một cấu hình ghi đè, hãy nhấn nút **✕** bên cạnh mục đó trong danh sách ghi đè hiện tại.
+
+### 4. Chạy mô phỏng từ chối (Tab "Báo cáo mô phỏng từ chối")
+Tính năng này dùng để kiểm tra tính linh hoạt của thuật toán khi học sinh từ chối cố vấn được phân bổ (tỷ lệ 20%):
+1. Nhấn nút **🔄 Mô phỏng từ chối (20%)** ở Sidebar.
+2. Giao diện sẽ tự động chuyển sang Tab Mô phỏng.
+3. Hệ thống hiển thị các chỉ số so sánh trước và sau khi từ chối, bao gồm số lượng học sinh bị từ chối, số ca ghép đôi lại (rematch) thành công và số ca không thể ghép lại.
+4. Bảng chi tiết bên dưới liệt kê cụ thể từng học sinh bị ảnh hưởng, cố vấn cũ (bị từ chối), cố vấn mới (sau khi ghép lại) và trạng thái/nguyên nhân chi tiết.
 
 ---
 

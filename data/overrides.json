@@ -1,5 +1,10 @@
 {
-  "forced": [],
+  "forced": [
+    [
+      "d6b3c2d4-da2e-4105-8601-82c4032e5c89",
+      "b496298a-cb3c-47aa-98d5-ec824b89207d"
+    ]
+  ],
   "blocked": [],
   "skipped_students": [],
   "skipped_mentors": []
